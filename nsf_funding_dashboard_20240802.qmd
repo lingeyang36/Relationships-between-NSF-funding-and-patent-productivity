@@ -1,0 +1,1433 @@
+---
+title: "Relationships between NSF funding and patent productivity"
+author: "Ernest Alema-Mensah, Rachael Allbritten, Abdel Lawani, Christine Swanson, Karina Vega-Villa, Linge Yang"
+format: dashboard
+---
+```{r}
+## This section has all of the respondent counts for groups used in the following
+## analysis.
+
+library(tidyverse)
+library(plotly)
+library(see)
+
+## This is the data frame created by Linge 
+df <- read.csv("P:/tr-ncses-2024/Team Projects/Team 3/Analytic Data for Team 3/Phd.csv",stringsAsFactors = TRUE) %>% 
+  mutate(sector = case_when(EMSECSM == "1" ~ "Academia",
+                            EMSECSM == "2" ~ "Government",
+                            EMSECSM == "3" ~ "Industry"),
+         GENDER = case_when(GENDER == "M" ~ "Male",
+                            GENDER == "F" ~ "Female"),
+         FieldHighest = case_when(str_detect(FieldHighest,"Biological") ~ "Life sciences",
+                                  str_detect(FieldHighest,"Physical") ~ "Physical sciences",
+                                  str_detect(FieldHighest,"Social") ~ "Social sciences",
+                                  str_detect(FieldHighest,"math") ~ "Comp sci/math",
+                                  TRUE ~ FieldHighest))
+
+## And this is the same dataset with only people who did/did not receive NSF funding
+nsf.df <- df %>% 
+  filter(!is.na(NSF_Funding))
+
+## The tables below summarize the underlying counts for combinations of variables
+## has_patent: Boolean for whether a survey respondent has a patent
+## NSF Fudning: Boolean, indicates whether a respondent received unding from NSF
+## GENDER: Indicates whether respondent is male or female
+## race_eth: Indicates survey respondent's race/ethnicity
+## FieldHighest: indicates survey respondent's discipline
+## sector : indicates survey respondent's job sector (academia, government, industry)
+
+## For the first data frame, I was only looking at how many PhD holders do or
+## do not have patents. This data frame is grouped by "has_patent" and summarized
+## by count and weighted count
+patents <- df %>% 
+  group_by(has_patent) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+
+write.csv(patents,"patents.csv")
+
+## For all other data frames, I filtered for only survey respondents who have patents.
+## I then grouped by whether they received NSF funding and other demographic
+## attributes. I used the summarize function to count the total number of 
+## respondents within each group as well as weights for each group.
+
+## Grouped by gender
+gender <- df %>% 
+  filter(has_patent=="True") %>% 
+  group_by(GENDER) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+gender %>% 
+  write.csv("gender.csv")
+
+## Grouped by race/ethnicity
+race <- df %>% 
+  filter(has_patent=="True") %>% 
+  group_by(race_eth) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+race %>% 
+  write.csv("race.csv")
+
+## Grouped by discipline
+discipline <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(FieldHighest) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+
+discipline%>% 
+  write.csv("discipline.csv")
+
+## Removing redacted disciplines from the pie chart
+discipline <- discipline %>% 
+  filter(!Redactions == "REDACT")
+
+## Grouped by job sector
+job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(sector) %>% 
+  summarize(n = n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n < 5 ~ "REDACT")) 
+
+job %>% 
+  write.csv("job_sector.csv")
+
+## Grouped by NSF funding (yes/no)
+nsf <- df %>% 
+  filter(has_patent=="True") %>% 
+  group_by(NSF_Funding) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ ""))  
+write.csv(nsf,"nsf.csv")
+
+## Grouped by NSF funding (yes/no) and gender
+nsf_gender <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,GENDER) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+
+nsf_gender %>% 
+  write.csv("nsf_gender.csv")
+
+## Grouped by NSF funding and race
+nsf_race <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,race_eth) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+nsf_race %>% 
+  write.csv("nsf_race.csv")
+
+## Grouped by NSF funding and discipline
+nsf_discipline <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,FieldHighest) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ ""))
+
+nsf_discipline %>% 
+  write.csv("nsf_discipline.csv")
+
+nsf_discipline <- nsf_discipline %>% 
+  filter(Redactions != "REDACT")
+
+## Grouped by NSF funding and job sector
+nsf_job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,sector) %>% 
+  summarize(n=n(),nwt=sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redcations = case_when(n<5 ~ "REDACT"))
+
+nsf_job %>% 
+  write.csv("nsf_job.csv")
+
+## Grouped by NSF funding, gender, and race
+nsf_gender_race <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,GENDER,race_eth) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+
+nsf_gender_race %>% 
+  write.csv("nsf_gender_race.csv")
+
+## Grouped by NSF funding, gender, and discipline
+nsf_gender_discipline <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,GENDER,FieldHighest) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+
+nsf_gender_discipline %>% 
+  write.csv("nsf_gender_discipline.csv")
+
+## Grouped by NSF funding, gender, and job sector
+nsf_gender_job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,GENDER,sector) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT")) 
+
+nsf_gender_job %>% 
+  write.csv("nsf_gender_job.csv")
+
+## Grouped by NSF funding, gender, race, and discipline
+nsf_gender_race_discipline <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,GENDER,race_eth,FieldHighest) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+
+nsf_gender_race_discipline %>% 
+  write.csv("nsf_gender_race_discipline.csv")
+
+## Grouped by NSF funding, gender, race, and job
+nsf_gender_race_job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,GENDER,race_eth,sector) %>% 
+  summarize(n=n(),nwt=sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactiosn = case_when(n<5 ~ "REDACT")) 
+
+nsf_gender_race_job %>% 
+  write.csv("nsf_gender_race_job.csv")
+
+## Grouped by NSF funding, gender, race, discipline, and job
+nsf_gender_race_discipline_job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding, GENDER,race_eth,FieldHighest,sector) %>% 
+  summarize(n=n(),nwt=sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT")) 
+
+nsf_gender_race_discipline_job %>% 
+  write.csv("nsf_gender_race_discipline_job.csv")
+
+## Grouped by NSF funding, race, and discipline
+nsf_race_discipline <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,race_eth,FieldHighest) %>% 
+  summarize(n=n(), nwt = sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT",
+         TRUE ~ "")) 
+
+nsf_race_discipline %>% 
+  write.csv("nsf_race_discipline.csv")
+
+## Grouped by NSF funding, race, and job sector
+nsf_race_job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,race_eth,sector) %>% 
+  summarize(n=n(),nwt=sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT")) 
+
+nsf_race_job %>% 
+  write.csv("nsf_race_job.csv")
+
+## Grouped by NSF funding, race, discipline, and job sector
+nsf_race_discipline_job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,race_eth,FieldHighest,sector) %>% 
+  summarize(n=n(),nwt=sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT")) 
+
+nsf_race_discipline_job %>% 
+  write.csv("nsf_race_discipline_job.csv")
+
+## Grouped by NSF funding, discipline, and job sector
+nsf_discipline_job <- df %>% 
+  filter(has_patent == "True") %>% 
+  group_by(NSF_Funding,FieldHighest,sector) %>% 
+  summarize(n=n(),nwt=sum(WTSURVY)) %>% 
+  mutate(wtdpct = nwt/sum(nwt),
+         Redactions = case_when(n<5 ~ "REDACT")) 
+
+nsf_discipline_job %>% 
+  write.csv("nsf_discipline_job.csv")
+
+```
+
+```{r}
+df.long <- df %>%  select(n_us_patent,pat_citation_ct_mean) %>% 
+  pivot_longer(cols=c(n_us_patent,pat_citation_ct_mean)) %>% 
+  mutate(name = case_when(name == "n_us_patent" ~ "Number of U.S. patents",
+                          name == "pat_citation_ct_mean" ~ "Mean patent citation count"),
+         name = factor(name,levels=c("Number of U.S. patents","Mean patent citation count")))
+
+
+pats <- round(patents$wtdpct[2]*100,1)
+```
+
+# Overview of PhD patent-holders
+## Row {height = 30%}
+### Column {width=50%}
+#### Row {.tabset}
+
+```{r}
+#| title: Overall
+
+patents %>% 
+  mutate(has_patent = case_when(has_patent == "True" ~ "U.S.patent-holder",
+                                has_patent == "False" ~ "No U.S. patents")) %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~has_patent,
+    marker = list(
+      colors = c("#c9ab48","#005ea2")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "PhD patent-holders",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+```
+
+```{r}
+#| title: Gender
+
+gender %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~GENDER,
+    marker = list(
+      colors = c("#00bde3","#005ea2")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "PhD patent-holders",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+```
+
+```{r}
+#| title: Race/ethnicity
+
+race %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~race_eth,
+    marker = list(
+      colors = c("#005ea2","#c9ab48","#04c585","#00bde3","#4c3d69")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "PhD patent-holders",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+```
+
+```{r}
+#| title: Discipline
+
+discipline %>%
+  filter(Redactions != "REDACT") %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~FieldHighest,
+    marker = list(
+      colors = c("#005ea2","#c9ab48","#04c585","#00bde3","#168092","#4c3d69")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "PhD patent-holders",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+
+```
+
+```{r}
+#| title: Job sector
+
+job %>% 
+  filter(is.na(Redactions) & !is.na(sector)) %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~sector,
+    marker = list(
+      colors = c("#005ea2","#c9ab48","#04c585")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "PhD patent-holders",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+
+```
+
+### Column {width=50%}
+```{r}
+#| title: Patent productivity
+
+df.long %>%
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~value,
+    y = ~name,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+
+```
+
+## Row {height = 70%}
+### Column{width = 50%}
+### Row {.tabset}
+```{r}
+#| title: Gender
+#| fig-cap: Number of U.S. patents
+
+df %>%
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~n_us_patent,
+    y = ~GENDER,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+    title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+
+```
+
+```{r}
+#| title: Race/ethinicity
+#| fig-cap: Number of U.S. patents
+
+df %>%
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~n_us_patent,
+    y = ~race_eth,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+
+```
+
+```{r}
+#| title: Discipline
+#| fig-cap: Number of U.S. patents
+
+df %>%
+  filter(FieldHighest != "Non-S&E Fields") %>% 
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    points = FALSE,
+    width = 5,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~n_us_patent,
+    y = ~FieldHighest,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+
+```
+
+```{r}
+#| title: Job sector
+#| fig-cap: Number of U.S. patents
+
+df %>%
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~n_us_patent,
+    y = ~sector,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+```
+
+### Column{width = 50%}
+### Row{.tabset}
+```{r}
+#| title: Gender
+#| fig-cap: Mean patent citation count
+
+df %>%
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~pat_citation_ct_mean,
+    y = ~GENDER,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+
+```
+
+```{r}
+#| title: Race/ethinicity
+#| fig-cap: Mean patent citation count
+
+df %>%
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~pat_citation_ct_mean,
+    y = ~race_eth,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+
+
+```
+
+```{r}
+#| title: Discipline
+#| fig-cap: Mean patent citation count
+
+df %>%
+  filter(FieldHighest != "Non-S&E Fields") %>% 
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~pat_citation_ct_mean,
+    y = ~FieldHighest,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+
+```
+
+```{r}
+#| title: Job sector
+#| fig-cap: Mean patent citation count
+
+df %>%
+  plot_ly(
+    type = "violin",
+    orientation = "h",
+    width = 5,
+    points = FALSE,
+    spanmode = "hard"
+  ) %>% 
+  add_trace(
+    x = ~pat_citation_ct_mean,
+    y = ~sector,
+    side = "positive",
+    color = I("#005ea2"),
+    showlegend = FALSE
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = ""
+    ),
+    yaxis = list(
+      title = "",
+      zeroline = FALSE
+    ),
+    hovermode = "y unified",
+    violingap = 0
+  )
+```
+
+# NSF funding and patent productivity
+
+```{r}
+nsf.df.long <- nsf.df %>%  select(n_us_patent,pat_citation_ct_mean,NSF_Funding) %>% 
+    pivot_longer(cols=c(n_us_patent,pat_citation_ct_mean)) %>% 
+  mutate(name = fct_recode(name,"Number of U.S. patents" = "n_us_patent","Mean patent citation count"="pat_citation_ct_mean"))
+
+fund <- round(nsf$wtdpct[2]*100,1)
+```
+
+## Row {height = 30%}
+### Column {width=50%}
+#### Row {.tabset}
+
+```{r}
+#| title: Overall
+
+nsf %>% 
+  mutate(NSF_Funding = case_when(NSF_Funding == "yes" ~ "NSF-funded",
+                                 NSF_Funding == "no" ~ "Not NSF-funded")) %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~NSF_Funding,
+    marker = list(
+      colors = c("#c9ab48","#005ea2")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "Funded by NSF",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+```
+
+```{r}
+#| title: Gender
+
+nsf_gender %>% 
+  filter(NSF_Funding == "yes") %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~GENDER,
+    marker = list(
+      colors = c("#00bde3","#005ea2")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "Funded by NSF",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+```
+
+```{r}
+#| title: Race/ethnicity
+
+nsf_race %>% 
+  filter(NSF_Funding=="yes") %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~race_eth,
+    marker = list(
+      colors = c("#005ea2","#c9ab48","#04c585","#00bde3","#4c3d69")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "Funded by NSF",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+```
+
+```{r}
+#| title: Discipline
+
+nsf_discipline %>%
+  filter(Redactions != "REDACT" & NSF_Funding == "yes") %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~FieldHighest,
+    marker = list(
+      colors = c("#005ea2","#c9ab48","#04c585","#00bde3","#168092","#4c3d69")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "NSF Funding",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+
+```
+
+```{r}
+#| title: Job sector
+
+nsf_job %>% 
+  filter(is.na(Redcations) & !is.na(sector) & NSF_Funding=="yes") %>% 
+  plot_ly(
+    values = ~nwt,
+    labels = ~sector,
+    marker = list(
+      colors = c("#005ea2","#c9ab48","#04c585")
+    )
+  ) %>% 
+  add_pie(hole = 0.6) %>% 
+  layout(
+    title = "Funded by NSF",
+    xaxis = list(
+      showgrid = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    ),
+    yaxis = list(
+      showgride = FALSE,
+      zeroline = FALSE,
+      showticklabels = FALSE
+    )
+  )
+
+
+```
+
+
+### Column {width=50%}
+```{r}
+#| title: Patent productivity
+
+nsf.df.long %>%
+  plot_ly(type = "violin",
+          orientation = "h", 
+          points = FALSE,
+          spanmode = "hard") %>%
+  add_trace(
+    x=~value[nsf.df.long$NSF_Funding == 'yes'],
+    y=~name[nsf.df.long$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    side = 'positive',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~value[nsf.df.long$NSF_Funding == 'no'],
+    y=~name[nsf.df.long$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    side = 'positive',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+# p1 <- ggplot(nsf.df.long,aes(factor(name),value,fill=NSF_Funding,color=NSF_Funding))+
+#    geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+
+#ggplotly(p1)
+  
+```
+
+## Row {.flow}
+### Column {.tabset}
+```{r}
+#| title: Gender
+#| fig-cap:
+#|  - Number of U.S. patents
+
+nsf.df %>%
+  mutate(GENDER = as.factor(GENDER)) %>%
+plot_ly(type = "violin", 
+        width = 3,
+        orientation="h",
+        side='positive',
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'yes'],
+    y=~GENDER[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'no'],
+    y=~GENDER[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+
+# ggplot(nsf.df,aes(factor(GENDER),n_us_patent,fill=NSF_Funding))+
+# #   geom_violin(trim=FALSE,alpha=0.3)+
+# #   facet_wrap(~GENDER)+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+# 
+# ggplot(nsf.df,aes(factor(GENDER),pat_citation_ct_mean,fill=NSF_Funding))+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+
+```
+
+```{r}
+#| title: Race/ethnicity
+#| fig-cap:
+#|  - Number of US patents
+
+nsf.df %>%
+  mutate(race_eth = as.factor(race_eth)) %>%
+plot_ly(type = "violin", 
+        width = 3,
+        orientation="h",
+        side='positive',
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'yes'],
+    y=~race_eth[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'no'],
+    y=~race_eth[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+# ggplot(nsf.df,aes(factor(race_eth),n_us_patent,fill=NSF_Funding))+
+# #   geom_violin(trim=FALSE,alpha=0.3)+
+# #   facet_wrap(~GENDER)+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+# 
+# ggplot(nsf.df,aes(factor(race_eth),pat_citation_ct_mean,fill=NSF_Funding))+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+
+```
+
+```{r}
+#| title: Discipline
+#| fig-cap:
+#|  - Number of US patents
+
+nsf.df %>%
+  filter(!FieldHighest %in% c("Non-S&E Fields","S&E-Related Fields","Social sciences")) %>% 
+  mutate(FieldHighest = as.factor(FieldHighest)) %>%
+plot_ly(type = "violin", 
+        width = 3,
+        orientation="h",
+        side='positive',
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'yes'],
+    y=~FieldHighest[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'no'],
+    y=~FieldHighest[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+# ggplot(nsf.df,aes(factor(FieldHighest),n_us_patent,fill=NSF_Funding))+
+# #   geom_violin(trim=FALSE,alpha=0.3)+
+# #   facet_wrap(~GENDER)+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+# 
+# ggplot(nsf.df,aes(factor(FieldHighest),pat_citation_ct_mean,fill=NSF_Funding))+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+
+```
+
+```{r}
+#| title: Job sector
+#| fig-cap:
+#|  - Number of US patents
+
+nsf.df %>%
+  mutate(sector = as.factor(sector)) %>%
+plot_ly(type = "violin", 
+        width = 3,
+        orientation="h",
+        side='positive',
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'yes'],
+    y=~sector[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~n_us_patent[nsf.df$NSF_Funding == 'no'],
+    y=~sector[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+# ggplot(nsf.df,aes(factor(sector),n_us_patent,fill=NSF_Funding))+
+# #   geom_violin(trim=FALSE,alpha=0.3)+
+# #   facet_wrap(~GENDER)+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+#   labs(x="",y="",fill="NSF funding",color="NSF funding")
+# 
+# ggplot(nsf.df,aes(factor(sector),pat_citation_ct_mean,fill=NSF_Funding))+
+#   geom_violinhalf(trim=FALSE,position = "identity",alpha=0.3)+
+#   scale_fill_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   scale_color_manual(values=c("#c9ab48","#005ea2"),labels=c("No","Yes"))+
+#   coord_fixed(ratio=2)+
+#   coord_flip()+
+#   theme_bw()+
+#   theme(text = element_text(size = 20),legend.position = "bottom")+
+# labs(x="",y="",fill="NSF funding",color="NSF funding")
+```
+
+### Column {.tabset}
+```{r}
+#| title: Gender
+#| fig-cap:
+#|   - Average patent citation count
+
+nsf.df %>%
+  mutate(GENDER = as.factor(GENDER)) %>%
+plot_ly(type = "violin",
+        orientation = "h",
+        width=3,
+        side ="positive",
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'yes'],
+    y=~GENDER[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    side = 'positive',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'no'],
+    y=~GENDER[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+```
+
+```{r}
+#| title: Race/ethnicity
+#| fig-cap:
+#|   - Average patent citation count
+
+nsf.df %>%
+  mutate(race_eth = as.factor(race_eth)) %>%
+plot_ly(type = "violin",
+        orientation = "h",
+        width=3,
+        side ="positive",
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'yes'],
+    y=~race_eth[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    side = 'positive',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'no'],
+    y=~race_eth[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+```
+
+```{r}
+#| title: Discipline
+#| fig-cap:
+#|   - Average patent citation count
+
+nsf.df %>%
+  filter(!FieldHighest %in% c("Non-S&E Fields","S&E-Related Fields","Social sciences")) %>% 
+  mutate(FieldHighest = as.factor(FieldHighest)) %>%
+plot_ly(type = "violin",
+        orientation = "h",
+        width=3,
+        side ="positive",
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'yes'],
+    y=~FieldHighest[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    side = 'positive',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'no'],
+    y=~FieldHighest[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+```
+
+```{r}
+#| title: Job sector
+#| fig-cap:
+#|   - Average patent citation count
+
+nsf.df %>%
+  mutate(sector = as.factor(sector)) %>%
+plot_ly(type = "violin",
+        orientation = "h",
+        width=3,
+        side ="positive",
+        points=FALSE,
+        spanmode = "hard") %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'yes'],
+    y=~sector[nsf.df$NSF_Funding == 'yes'],
+    legendegroup = 'yes',
+    scalegroup = 'yes',
+    name = 'Yes',
+    side = 'positive',
+    color = I("#005ea2")
+    ) %>%
+  add_trace(
+    x=~pat_citation_ct_mean[nsf.df$NSF_Funding == 'no'],
+    y=~sector[nsf.df$NSF_Funding == 'no'],
+    legendegroup = 'no',
+    scalegroup = 'no',
+    name = 'No',
+    color = I("#c9ab48")
+  ) %>%
+  layout(
+    xaxis=list(
+      title=""
+    ),
+    yaxis=list(
+      title = "",
+      zerloine = F
+    ),
+    hovermode = "y unified",
+    legend=list(
+      title = list(
+        text = "NSF funding"
+      )
+    )
+  )
+
+```
